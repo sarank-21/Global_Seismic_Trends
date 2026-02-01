@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 import time
+import pymysql
 from datetime import datetime
 from sqlalchemy import create_engine, text
 
@@ -25,15 +26,14 @@ if "page" not in st.session_state:
 # --------------------------------------------------
 # MYSQL CONNECTION
 # --------------------------------------------------
-engine = create_engine("mysql+pymysql://root:0007@localhost")
+engine = create_engine("mysql+mysqlconnector://root:0007@localhost")
+
 
 with engine.connect() as conn:
     conn.execute(text("CREATE DATABASE IF NOT EXISTS Earthquake_Database"))
     conn.commit()
 
-db_engine = create_engine(
-    "mysql+pymysql://root:0007@localhost/Earthquake_Database"
-)
+db_engine = create_engine( "mysql+mysqlconnector://root:0007@localhost/Earthquake_Database")
 
 # --------------------------------------------------
 # CREATE TABLE
@@ -111,11 +111,20 @@ if st.session_state.page == "home":
     # ---------------- FETCH DATA ----------------
     if fetch_button:
         st.info(f"Processing data for {start_year} – {end_year}")
+
+        # ---------------- PROGRESS BAR SETUP ----------------
+        total_steps = (end_year - start_year + 1) * 12
+        current_step = 0
+        progress_bar = st.progress(0.0)
+        status_text = st.empty()
+
         new_records = []
         year_ex = []  # <-- collect all existing years he
         years_fetched = []  # years for which new data was fetched
 
         for year in range(start_year, end_year + 1):
+            status_text.info(f"📅 Processing year {year}")
+
 
             # Check if this year already exists in DB
             check_query = """
@@ -138,8 +147,10 @@ if st.session_state.page == "home":
 
             # Fetch missing year data month by month
             for month in range(1, 13):
+                status_text.info(f"📅 {year} | ⏳ Fetching month {month}/12")
                 start_date = datetime(year, month, 1)
                 end_date = datetime(year + 1, 1, 1) if month == 12 else datetime(year, month + 1, 1)
+
 
                 params = {
                     "format": "geojson",
@@ -149,16 +160,12 @@ if st.session_state.page == "home":
                 }
 
                 try:
-                    r = requests.get(
-                        "https://earthquake.usgs.gov/fdsnws/event/1/query",
-                        params=params,
-                        timeout=30
-                    )
+                    request_data = requests.get( "https://earthquake.usgs.gov/fdsnws/event/1/query", params=params,timeout=30 )
 
-                    if r.status_code != 200:
+                    if request_data.status_code != 200:
                         continue
 
-                    features = r.json().get("features", [])
+                    features = request_data.json().get("features", [])
                     if not features:
                         continue
 
@@ -173,8 +180,7 @@ if st.session_state.page == "home":
                         for f in features
                     ])
 
-                    existing_ids = set(
-                        pd.read_sql("SELECT id FROM Earthquake", db_engine)["id"])
+                    existing_ids = set( pd.read_sql("SELECT id FROM Earthquake", db_engine)["id"])
 
                     df_month = df_month[~df_month["id"].isin(existing_ids)]
 
@@ -182,14 +188,19 @@ if st.session_state.page == "home":
                         new_records.append(df_month)
                         year_had_data = True  # mark that this year got new data
 
-
                     time.sleep(1)
+                    current_step += 1
+                    progress_bar.progress(min(current_step / total_steps, 1.0))
+
 
                 except Exception as e:
                     st.error(f"{year}-{month:02d} failed: {e}")
 
             if year_had_data:
                 years_fetched.append(year)  # add to list of fetched years
+
+            progress_bar.progress(1.0)
+        status_text.success("✅ Data fetching completed")
 
         # ---------------- SHOW SKIPPED YEARS ----------------
         if year_ex:
@@ -205,12 +216,15 @@ if st.session_state.page == "home":
             # Cleaning
             df_new["time"] = pd.to_datetime(df_new["time"], unit="ms")
             df_new["updated"] = pd.to_datetime(df_new["updated"], unit="ms")
+
             df_new.drop(columns=["tz", "title", "url", "detail"], inplace=True, errors="ignore")
+
             df_new["alert"].fillna("green", inplace=True)
             df_new["cdi"].fillna(round(df_new["cdi"].mean(), 1), inplace=True)
             df_new["felt"].fillna(round(df_new["felt"].mean(), 1), inplace=True)
             df_new["mmi"].fillna(round(df_new["mmi"].mean(), 1), inplace=True)
             df_new["nst"].fillna(round(df_new["nst"].mean(), 1), inplace=True)
+            
             df_new["sources"] = df_new["sources"].str.strip(",")
             df_new["types"] = df_new["types"].str.strip(",")
             df_new["ids"] = df_new["ids"].str.strip(",")
