@@ -117,14 +117,13 @@ if st.session_state.page == "home":
         current_step = 0
         progress_bar = st.progress(0.0)
         status_text = st.empty()
-
+        # ----------------------------------------------------
         new_records = []
         year_ex = []  # <-- collect all existing years he
         years_fetched = []  # years for which new data was fetched
 
         for year in range(start_year, end_year + 1):
-            status_text.info(f"📅 Processing year {year}")
-
+            status_text.info(f"📅 Processing year {year}") #PROGRESS BAR
 
             # Check if this year already exists in DB
             check_query = """
@@ -147,10 +146,9 @@ if st.session_state.page == "home":
 
             # Fetch missing year data month by month
             for month in range(1, 13):
-                status_text.info(f"📅 {year} | ⏳ Fetching month {month}/12")
+                status_text.info(f"📅 {year} | ⏳ Fetching month {month}/12") #PROGRESS BAR
                 start_date = datetime(year, month, 1)
                 end_date = datetime(year + 1, 1, 1) if month == 12 else datetime(year, month + 1, 1)
-
 
                 params = {
                     "format": "geojson",
@@ -182,15 +180,15 @@ if st.session_state.page == "home":
 
                     existing_ids = set( pd.read_sql("SELECT id FROM Earthquake", db_engine)["id"])
 
-                    df_month = df_month[~df_month["id"].isin(existing_ids)]
+                    df_month = df_month[~df_month["id"].isin(existing_ids)] # to check duplicate ids after new data extraction if repeated ids occurs it removes that id.
 
                     if not df_month.empty:
                         new_records.append(df_month)
                         year_had_data = True  # mark that this year got new data
 
                     time.sleep(1)
-                    current_step += 1
-                    progress_bar.progress(min(current_step / total_steps, 1.0))
+                    current_step += 1  #PROGRESS BAR
+                    progress_bar.progress(min(current_step / total_steps, 1.0)) 
 
 
                 except Exception as e:
@@ -864,4 +862,3 @@ elif st.session_state.page == "Depth, Location & Distance-Based  Analysis":
     if st.button("⬅ Go Back"):
         st.session_state.page = "analysis"
         st.rerun()
-
