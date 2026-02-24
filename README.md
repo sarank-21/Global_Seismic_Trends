@@ -217,6 +217,7 @@ venv\Scripts\activate      # (Windows)
 pip install -r requirements.txt
 ```
 requirements.txt:
+
     * streamlit
     * pandas
     * sqlalchemy
