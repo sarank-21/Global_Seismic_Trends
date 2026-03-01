@@ -334,3 +334,14 @@ Planned improvements include:
    * 🔔 Real-time alert notifications
    * 📊 Exportable reports (PDF / CSV)
 
+## 📌 Author
+```
+Saran K
+Data Analytics & Visualization Enthusiast
+Capstone Project – Global Health Data Analysis
+```
+## ⭐ If You Like This Project
+
+```
+Give it a ⭐ on GitHub and feel free to fork it!
+```
